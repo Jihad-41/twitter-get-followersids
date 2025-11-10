@@ -1,0 +1,16 @@
+[
+  {
+    "source_url": "https://api.twitter.com/1.1/followers/ids.json?screen_name=exampleuser&count=5000",
+    "type": "api",
+    "metadata": {
+      "description": "Sample v1.1 API endpoint returning follower IDs only."
+    }
+  },
+  {
+    "source_url": "https://api.twitter.com/2/users/123456789/followers?max_results=1000",
+    "type": "api",
+    "metadata": {
+      "description": "Sample v2 API endpoint returning follower user objects."
+    }
+  }
+]
