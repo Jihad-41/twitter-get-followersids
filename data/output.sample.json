@@ -1,0 +1,9 @@
+[
+  {
+    "follower_id": "134562892",
+    "username": "techinsider",
+    "profile_url": "https://twitter.com/techinsider",
+    "timestamp": "2025-11-10T10:42:00Z",
+    "source_url": "https://api.twitter.com/1.1/followers/ids.json?screen_name=exampleuser"
+  }
+]
