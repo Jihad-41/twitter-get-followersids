@@ -1,0 +1,171 @@
+if (Array.isArray(json.ids)) {
+    for (const id of json.ids) {
+      records.push(
+        buildRecord({
+          id: id,
+          username: null,
+          sourceUrl,
+          timestamp
+        })
+      );
+    }
+  }
+
+  // Case 2: followers/list.json or similar with `users`
+  if (Array.isArray(json.users)) {
+    for (const user of json.users) {
+      const id = user.id_str || user.id;
+      const username = user.screen_name || user.username || user.handle;
+      if (!id && !username) continue;
+
+      records.push(
+        buildRecord({
+          id,
+          username,
+          sourceUrl,
+          timestamp
+        })
+      );
+    }
+  }
+
+  // Case 3: v2 style `{ data: [...] }`
+  if (Array.isArray(json.data)) {
+    for (const user of json.data) {
+      const id = user.id_str || user.id;
+      const username = user.username || user.screen_name || user.handle;
+      if (!id && !username) continue;
+
+      records.push(
+        buildRecord({
+          id,
+          username,
+          sourceUrl,
+          timestamp
+        })
+      );
+    }
+  }
+
+  // Fallback: plain array of user objects or ids
+  if (Array.isArray(json) && records.length === 0) {
+    for (const item of json) {
+      if (typeof item === 'string' || typeof item === 'number') {
+        records.push(
+          buildRecord({
+            id: item,
+            username: null,
+            sourceUrl,
+            timestamp
+          })
+        );
+      } else if (item && typeof item === 'object') {
+        const id = item.id_str || item.id;
+        const username =
+          item.username || item.screen_name || item.handle || null;
+
+        if (!id && !username) continue;
+        records.push(
+          buildRecord({
+            id,
+            username,
+            sourceUrl,
+            timestamp
+          })
+        );
+      }
+    }
+  }
+
+  return records;
+}
+
+/**
+ * Parse followers from HTML content.
+ * Looks for elements with typical Twitter-like attributes.
+ */
+function parseHtmlStructure(html, sourceUrl, timestamp) {
+  const records = [];
+  if (typeof html !== 'string') return records;
+
+  const $ = cheerio.load(html);
+
+  // Look for data-user-id (old Twitter layout) or data-user-id attributes
+  $('[data-user-id]').each((_, el) => {
+    const id = $(el).attr('data-user-id');
+    const username =
+      $(el).attr('data-screen-name') ||
+      $(el).attr('data-username') ||
+      $(el).find('a[href^="/"]').first().attr('href')?.replace('/', '');
+    if (!id && !username) return;
+
+    records.push(
+      buildRecord({
+        id,
+        username,
+        sourceUrl,
+        timestamp
+      })
+    );
+  });
+
+  // Fallback: anchor tags that look like profile links
+  if (records.length === 0) {
+    $('a[href^="https://twitter.com/"], a[href^="/"]').each((_, el) => {
+      const href = $(el).attr('href') || '';
+      let usernameMatch =
+        href.match(/^https:\/\/twitter\.com\/([^/?#]+)/) ||
+        href.match(/^\/([^/?#]+)/);
+      if (!usernameMatch) return;
+
+      const username = usernameMatch[1];
+      if (!username || username.toLowerCase() === 'home') return;
+
+      records.push(
+        buildRecord({
+          id: null,
+          username,
+          sourceUrl,
+          timestamp
+        })
+      );
+    });
+  }
+
+  return records;
+}
+
+/**
+ * Public API: parse followers from arbitrary response data.
+ */
+function parseFollowers(data, sourceUrl) {
+  const timestamp = new Date().toISOString();
+
+  // If axios already parsed JSON
+  if (data && typeof data === 'object' && !Buffer.isBuffer(data)) {
+    const jsonRecords = parseJsonStructure(data, sourceUrl, timestamp);
+    if (jsonRecords.length > 0) return jsonRecords;
+  }
+
+  // If it's a string, treat as HTML or raw JSON string
+  if (typeof data === 'string') {
+    // Try to parse as JSON first
+    try {
+      const parsed = JSON.parse(data);
+      const jsonRecords = parseJsonStructure(parsed, sourceUrl, timestamp);
+      if (jsonRecords.length > 0) return jsonRecords;
+    } catch (e) {
+      // Not JSON, continue as HTML
+    }
+
+    const htmlRecords = parseHtmlStructure(data, sourceUrl, timestamp);
+    if (htmlRecords.length > 0) return htmlRecords;
+  }
+
+  // If nothing detected, return empty list
+  return [];
+}
+
+module.exports = {
+  parseFollowers
+};
